@@ -1,0 +1,3 @@
+[submodule "DAGAN"]
+	path = DAGAN
+	url = git@github.com:ffrankies/DAGAN.git
