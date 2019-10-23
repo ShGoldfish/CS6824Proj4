@@ -15,7 +15,8 @@ import scipy.io
 # from tensorflow.examples.tutorials.mnist import input_data
 
 import keras.backend as K
-from keras.models import Sequential
+from keras.models import Sequential, Model
+from keras.layers import Input
 from keras.layers import Dense, Activation, Flatten, Reshape
 from keras.layers import LeakyReLU, Dropout
 from keras.layers import BatchNormalization
@@ -78,33 +79,35 @@ class DCGAN(object):
     def generator(self):
         if self.G:
             return self.G
-        self.G = Sequential()
+        # self.G = Sequential()
+        noiseIn = Input(shape=(100,))
         dropout = 0.4
         depth = 64 + 64 + 64 + 64  # why is this the depth?
         # dim = 7
         dim = int(self.img_rows / 16)
         # In: 100
         # Out: dim x dim x depth
-        self.G.add(Dense(dim, input_dim=100, activation='sigmoid'))
-        self.G.add(BatchNormalization(momentum=0.9))
-        self.G.add(Dropout(dropout))
+        dense1 = Dense(dim, activation='sigmoid')(noiseIn)
+        batchnorm1 = BatchNormalization(momentum=0.9)(dense1)
+        dropout1 = Dropout(dropout)(batchnorm1)
 
-        self.G.add(Dense(dim * 2, input_dim=100, activation='sigmoid'))
-        self.G.add(BatchNormalization(momentum=0.9))
-        self.G.add(Dropout(dropout))
-        
-        self.G.add(Dense(dim * 4, input_dim=100, activation='sigmoid'))
-        self.G.add(BatchNormalization(momentum=0.9))
-        self.G.add(Dropout(dropout))
+        dense2 = Dense(dim * 2, activation='sigmoid')(dropout1)
+        batchnorm2 = BatchNormalization(momentum=0.9)(dense2)
+        dropout2 = Dropout(dropout)(batchnorm2)
 
-        self.G.add(Dense(dim * 8, input_dim=100, activation='sigmoid'))
-        self.G.add(BatchNormalization(momentum=0.9))
-        self.G.add(Dropout(dropout))
-        
-        self.G.add(Dense(self.img_rows, input_dim=100, activation='linear'))
-        self.G.add(BatchNormalization(momentum=0.9))
-        self.G.add(Dropout(dropout))
-        self.G.add(Reshape((-1, 1)))
+        dense3 = Dense(dim * 4, activation='sigmoid')(dropout2)
+        batchnorm3 = BatchNormalization(momentum=0.9)(dense3)
+        dropout3 = Dropout(dropout)(batchnorm3)
+
+        dense4 = Dense(dim * 8, activation='sigmoid')(dropout3)
+        batchnorm4 = BatchNormalization(momentum=0.9)(dense4)
+        dropout4 = Dropout(dropout)(batchnorm4)
+
+        dense5 = Dense(self.img_rows, activation='linear')(dropout4)
+        batchnorm5 = BatchNormalization(momentum=0.9)(dense5)
+        dropout5 = Dropout(dropout)(batchnorm5)
+        generated_image = Reshape((-1, 1))(dropout5)
+        self.G = Model(inputs=noiseIn, outputs=generated_image)
         self.G.summary()
 
         return self.G
@@ -155,6 +158,7 @@ class FFGAN(object):
         if save_interval > 0:
             noise_input = np.random.uniform(-1.0, 1.0, size=[16, 100])
         for i in range(train_steps):
+            # only trains the discriminator: to tell fake images from real ones
             images_train = self.x_train[np.random.randint(0,
                 self.x_train.shape[0], size=batch_size), :, :]
             noise = np.random.uniform(-1.0, 1.0, size=[batch_size, 100])
@@ -164,6 +168,8 @@ class FFGAN(object):
             y[batch_size:, :] = 0
             d_loss = self.discriminator.train_on_batch(x, y)
 
+            # should only train the generator to learn the patterns for creating a new image
+            # in practice, will also train the discriminator
             y = np.ones([batch_size, 1])
             noise = np.random.uniform(-1.0, 1.0, size=[batch_size, 100])
             a_loss = self.adversarial.train_on_batch(noise, y)
