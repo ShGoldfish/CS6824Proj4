@@ -8,10 +8,12 @@ Usage: python3 ffdagan.py
 
 import math
 import time
+from copy import copy
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io
+import pickle
 
 # Tell tensorflow warnings to take a hike
 import tensorflow as tf
@@ -164,10 +166,10 @@ class FFDAGAN(object):
     def __init__(self, dataset):
         self.channel = 1
         self.dataset = dataset
-        data = scipy.io.loadmat("data/{}.mat".format(dataset))
+        self.data = scipy.io.loadmat("data/{}.mat".format(dataset))
 
         # TODO: figure out how to split data into train, valid and test sets
-        self.x_train = data['X']
+        self.x_train = self.data['X']
         img_size = math.ceil(self.x_train.shape[1] / 4.0)
         self.img_rows = int(img_size * 4.0)
         self.img_cols = 1
@@ -211,8 +213,6 @@ class FFDAGAN(object):
         filename = "{}_{}.png".format(self.__class__.__name__, self.dataset)
         image_indices = np.random.randint(0, self.x_train.shape[0], samples)
         images = self.x_train[image_indices, :, :]
-        # if fake:
-        # filename="{}_{}_fake.png".format(self.__class__.__name__, self.dataset)
         if noise is None:
             noise = np.random.uniform(-1.0, 1.0, size=[samples, 100])
         else:
@@ -239,6 +239,39 @@ class FFDAGAN(object):
         else:
             plt.show()
 
+    def augment(self):
+        """Uses the trained dagan to augment the dataset and saves the result to file.
+        """
+        unique_labels = np.unique(self.data["Y"])
+        label_count = dict()
+        for unique_label in unique_labels:
+            label_count[unique_label] = 0
+            for label in self.data["Y"]:
+                if label[0] == unique_label:
+                    label_count[unique_label] += 1
+        target_num_examples = max(label_count.values()) * 2
+        new_data = copy(self.data)
+        new_data["Real"] = np.asarray([1] * len(new_data["X"]))
+        for unique_label in unique_labels:
+            num_augmented = target_num_examples - label_count[unique_label]
+            noise = np.random.uniform(-1.0, 1.0, size=[num_augmented, 100])
+            matching_indices = np.where(self.data["Y"].ravel() == unique_label)
+            examples = np.random.choice(matching_indices[0], num_augmented, replace=True)
+            images = self.x_train[examples]
+            fake_images = self.generator.predict([noise, images])
+            fake_labels = np.asarray([unique_label] * num_augmented)
+            # [X X X X X X]
+            # [[X] [X] [X] [X] [X] [X] [P] [P] [P]]
+            # [X X X X X X]
+            fake_images_reshaped = fake_images[:, 0:new_data["X"].shape[1], :]
+            fake_images_reshaped = fake_images_reshaped.reshape(fake_images.shape[0], new_data["X"].shape[1])
+            new_data["X"] = np.concatenate((new_data["X"], fake_images_reshaped))
+            new_data["Y"] = np.concatenate((new_data["Y"], np.reshape(fake_labels, (-1, 1))))
+            new_data["Real"] = np.concatenate((new_data["Real"], np.asarray([0] * num_augmented)))
+        with open("{}_new.pkl".format(self.dataset), 'wb') as dataset:
+            pickle.dump(new_data, dataset, protocol=pickle.HIGHEST_PROTOCOL)
+    # End of augment()
+
 if __name__ == '__main__':
     ffdagan = FFDAGAN("ALLAML")
     timer = ElapsedTimer()
@@ -246,3 +279,4 @@ if __name__ == '__main__':
     timer.elapsed_time()
     ffdagan.plot_images(fake=True, save2file=True)
     ffdagan.plot_images(fake=False, save2file=True)
+    ffdagan.augment()
