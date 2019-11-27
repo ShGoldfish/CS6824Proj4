@@ -273,10 +273,13 @@ class FFDAGAN(object):
     # End of augment()
 
 if __name__ == '__main__':
-    ffdagan = FFDAGAN("ALLAML")
-    timer = ElapsedTimer()
-    ffdagan.train(train_steps=1, batch_size=1, save_interval=10)
-    timer.elapsed_time()
-    ffdagan.plot_images(fake=True, save2file=True)
-    ffdagan.plot_images(fake=False, save2file=True)
-    ffdagan.augment()
+    for dataset in ["ALLAML", "CLL_SUB_111", "colon", "GLI_85", "GLIOMA", "leukemia", "lung_discrete", "lung", 
+                    "lymphoma", "nci9", "Prostate_GE", "SMK_CAN_187", "TOX_171"]:
+        print("=====Dataset = {}=====".format(dataset))
+        ffdagan = FFDAGAN(dataset)
+        timer = ElapsedTimer()
+        ffdagan.train(train_steps=50, batch_size=5, save_interval=10)
+        timer.elapsed_time()
+        ffdagan.plot_images(fake=True, save2file=True)
+        ffdagan.plot_images(fake=False, save2file=True)
+        ffdagan.augment()
