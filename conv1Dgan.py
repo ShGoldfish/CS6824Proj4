@@ -223,23 +223,25 @@ class CONV1DGAN(object):
                     self.plot_images(save2file=True, samples=noise_input.shape[0], noise=noise_input, step=(i+1))
 
     def plot_images(self, save2file=False, fake=True, samples=16, noise=None, step=0):
-        filename = "{}_{}_real.png".format(self.__class__.__name__, self.dataset)
-        if fake:
-            filename="{}_{}_fake.png".format(self.__class__.__name__, self.dataset)
-            if noise is None:
-                noise = np.random.uniform(-1.0, 1.0, size=[samples, 100])
-            else:
-                filename = "{}_{}_fake_{}.png".format(self.__class__.__name__, self.dataset, step)
-            images = self.generator.predict(noise)
+        filename = "{}_{}.png".format(self.__class__.__name__, self.dataset)
+        image_indices = np.random.randint(0, self.x_train.shape[0], samples)
+        images = self.x_train[image_indices, :, :]
+        if noise is None:
+            noise = np.random.uniform(-1.0, 1.0, size=[samples, 100])
         else:
-            i = np.random.randint(0, self.x_train.shape[0], samples)
-            images = self.x_train[i, :, :]
+            filename = "{}_{}_{}.png".format(self.__class__.__name__, self.dataset, step)
+        fake_images = self.generator.predict(noise)
 
-        plt.figure(figsize=(2, 4))
+        plt.figure(figsize=(5, 4))
         # TODO: increase the width of each "image"
-        for i in range(images.shape[0]):
-            plt.subplot(samples, 1, i+1)
-            image = images[i, :, :]
+        for image_index in range(images.shape[0]):
+            plt.subplot(samples, 2, (image_index*2)+1)
+            image = images[image_index, :, :]
+            image = np.reshape(image, [self.img_cols, self.img_rows])
+            plt.imshow(image, cmap='gray', aspect='auto')
+            plt.axis('off')
+            plt.subplot(samples, 2, (image_index*2)+2)
+            image = fake_images[image_index, :, :]
             image = np.reshape(image, [self.img_cols, self.img_rows])
             plt.imshow(image, cmap='gray', aspect='auto')
             plt.axis('off')
@@ -253,7 +255,7 @@ class CONV1DGAN(object):
 if __name__ == '__main__':
     mnist_dcgan = CONV1DGAN("ALLAML")
     timer = ElapsedTimer()
-    mnist_dcgan.train(train_steps=10, batch_size=1, save_interval=10)
+    mnist_dcgan.train(train_steps=50, batch_size=5, save_interval=10)
     timer.elapsed_time()
     mnist_dcgan.plot_images(fake=True, save2file=True)
     mnist_dcgan.plot_images(fake=False, save2file=True)
