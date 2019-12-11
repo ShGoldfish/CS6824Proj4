@@ -9,6 +9,7 @@ Usage: python3 ffdagan.py
 import math
 import time
 from copy import copy
+import argparse
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,6 +28,12 @@ from keras.layers import Dense, Activation, Flatten, Reshape
 from keras.layers import LeakyReLU, Dropout
 from keras.layers import BatchNormalization
 from keras.optimizers import Adam, RMSprop
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--dataset", type=str, help="""The name of the
+                        dataset to load""")
+    return parser.parse_args()
 
 class ElapsedTimer(object):
     def __init__(self):
@@ -62,16 +69,17 @@ class DAGAN(object):
         # In: 28 x 28 x 1, depth = 1
         # Out: 14 x 14 x 1, depth=64
         input_shape = (self.img_rows, self.channel)
-        self.D.add(Dense(int(self.img_rows / 2), input_shape=input_shape, activation='tanh'))
+        dim = min(self.img_rows, 7129)
+        self.D.add(Dense(int(dim / 2), input_shape=input_shape, activation='tanh'))
         self.D.add(BatchNormalization(momentum=0.9))
         self.D.add(Dropout(dropout))
-        self.D.add(Dense(int(self.img_rows / 4), activation='tanh'))
+        self.D.add(Dense(int(dim / 4), activation='tanh'))
         self.D.add(BatchNormalization(momentum=0.9))
         self.D.add(Dropout(dropout))
-        self.D.add(Dense(int(self.img_rows / 8), activation='tanh'))
+        self.D.add(Dense(int(dim / 8), activation='tanh'))
         self.D.add(BatchNormalization(momentum=0.9))
         self.D.add(Dropout(dropout))
-        self.D.add(Dense(int(self.img_rows / 16), activation='tanh'))
+        self.D.add(Dense(int(dim / 16), activation='tanh'))
         self.D.add(BatchNormalization(momentum=0.9))
         self.D.add(Dropout(dropout))
 
@@ -87,7 +95,7 @@ class DAGAN(object):
             return self.G
 
         dropout = 0.4
-        dim = int(self.img_rows / 16)
+        dim = int(min(self.img_rows/16, 7129/16))
 
         imageIn = Input(shape=(self.img_rows, self.channel,), name="imageIn")
         imageReshape = Reshape((-1,))(imageIn)
@@ -273,13 +281,17 @@ class FFDAGAN(object):
     # End of augment()
 
 if __name__ == '__main__':
-    for dataset in ["ALLAML", "CLL_SUB_111", "colon", "GLI_85", "GLIOMA", "leukemia", "lung_discrete", "lung", 
-                    "lymphoma", "nci9", "Prostate_GE", "SMK_CAN_187", "TOX_171"]:
-        print("=====Dataset = {}=====".format(dataset))
-        ffdagan = FFDAGAN(dataset)
-        timer = ElapsedTimer()
-        ffdagan.train(train_steps=50, batch_size=5, save_interval=10)
-        timer.elapsed_time()
-        ffdagan.plot_images(fake=True, save2file=True)
-        ffdagan.plot_images(fake=False, save2file=True)
-        ffdagan.augment()
+    args = parse_args()
+    # for dataset in ["ALLAML", "CLL_SUB_111", "colon", "GLI_85", "GLIOMA", "leukemia", "lung_discrete", "lung", 
+    #                "lymphoma", "nci9", "Prostate_GE", "SMK_CAN_187", "TOX_171"]:
+    dataset = args.dataset
+    print("=====Dataset = {}=====".format(dataset))
+    ffdagan = FFDAGAN(dataset)
+    timer = ElapsedTimer()
+    ffdagan.train(train_steps=50, batch_size=5, save_interval=10)
+    timer.elapsed_time()
+    ffdagan.plot_images(fake=True, save2file=True)
+    ffdagan.plot_images(fake=False, save2file=True)
+    ffdagan.augment()
+    K.clear_session()
+
