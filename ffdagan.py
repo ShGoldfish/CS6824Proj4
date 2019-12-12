@@ -178,12 +178,24 @@ class FFDAGAN(object):
 
         # TODO: figure out how to split data into train, valid and test sets
         self.x_train = self.data['X']
+        self.real_width = self.data['X'].shape[1]
+        
+        # Encode image labels as one hot vectors with same shape as x_train
+        y = self.data['Y']
+        mapping = dict()
+        for index, label in enumerate(np.unique(y)):
+            mapping[label] = index
+        _y = np.asarray(list(map(lambda x: mapping[x[0]], y)))
+        y = np.eye(max(_y)+1)[_y].reshape(-1, max(_y)+1, 1)
+
         img_size = math.ceil(self.x_train.shape[1] / 4.0)
         self.img_rows = int(img_size * 4.0)
         self.img_cols = 1
         if self.img_rows != self.x_train.shape[1]:
             self.x_train = np.pad(self.x_train, ((0,0), (0, self.img_rows - self.x_train.shape[1])), 'minimum')
         self.x_train = self.x_train.reshape(self.x_train.shape[0], self.img_rows, 1).astype(np.float32)
+        self.x_train = np.hstack((self.x_train, y))
+        self.img_rows += y.shape[1]
 
         self.DAGAN = DAGAN(self.img_rows, self.img_cols)
         self.discriminator =  self.DAGAN.discriminator_model()
@@ -231,13 +243,13 @@ class FFDAGAN(object):
         # TODO: increase the width of each "image"
         for image_index in range(images.shape[0]):
             plt.subplot(samples, 2, (image_index*2)+1)
-            image = images[image_index, :, :]
-            image = np.reshape(image, [self.img_cols, self.img_rows])
+            image = images[image_index, :self.real_width, :]
+            image = np.reshape(image, [self.img_cols, self.real_width])
             plt.imshow(image, cmap='gray', aspect='auto')
             plt.axis('off')
             plt.subplot(samples, 2, (image_index*2)+2)
-            image = fake_images[image_index, :, :]
-            image = np.reshape(image, [self.img_cols, self.img_rows])
+            image = fake_images[image_index, :self.real_width, :]
+            image = np.reshape(image, [self.img_cols, self.real_width])
             plt.imshow(image, cmap='gray', aspect='auto')
             plt.axis('off')
         plt.tight_layout()
@@ -276,7 +288,7 @@ class FFDAGAN(object):
             new_data["X"] = np.concatenate((new_data["X"], fake_images_reshaped))
             new_data["Y"] = np.concatenate((new_data["Y"], np.reshape(fake_labels, (-1, 1))))
             new_data["Real"] = np.concatenate((new_data["Real"], np.asarray([0] * num_augmented)))
-        with open("{}_new.pkl".format(self.dataset), 'wb') as dataset:
+        with open("{}_new2.pkl".format(self.dataset), 'wb') as dataset:
             pickle.dump(new_data, dataset, protocol=pickle.HIGHEST_PROTOCOL)
     # End of augment()
 
